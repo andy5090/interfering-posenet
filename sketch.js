@@ -110,16 +110,17 @@ function draw() {
   noStroke();
   fill(0, 255, 0);
   textAlign(LEFT);
-  if (rWristX > paintStartLine || lWristX > paintStartLine) {
-    if (paintingArea === "right") {
+ 
+  if (paintingArea === "right") {
+    if (rWristX > paintStartLine || lWristX > paintStartLine) {
       text("Painting", 5, 30);
       painting = true;
     } else {
       text("Rest", 5, 30);
       painting = false;
     }
-  } else {
-    if (paintingArea === "left") {
+  } else if (paintingArea === "left") {
+      if (rWristX < paintStartLine || lWristX < paintStartLine) {
       text("Painting", 5, 30);
       painting = true;
     } else {
@@ -131,4 +132,10 @@ function draw() {
 
 function mouseClicked() {
   if (mouseX < width) paintStartLine = mouseX;
+}
+
+// This method can be removed after the source ID has been determined.
+function gotSources(sources) {
+  console.log(sources);
+ 
 }
