@@ -1,2 +1,2 @@
 #!/bin/bash
-sudo -S <<< "tkdgjs5090" http-server -p 5000 -c-1
+sudo -S <<< "1q2w3e4r" http-server -p 5000 -c-1

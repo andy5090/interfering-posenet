@@ -1,12 +1,21 @@
-let video;
+let videoSide;
+let videoTop;
 let poseNet;
+let poseNetTop;
 let rWristX = 0;
 let rWristY = 0;
 let lWristX = 0;
 let lWristY = 0;
+let rWristX_Top = 0;
+let rWristY_Top = 0;
+let lWristX_Top = 0;
+let lWristY_Top = 0;
 
-let paintStartLine;
-let paintingArea = "right";
+let sideResetCnt = 0;
+
+let paintLineSide = 450;
+let paintLineTop = 450;
+const paintingArea = "right";
 
 let button;
 let painting = false;
@@ -14,58 +23,67 @@ let paintAreaText;
 
 let socket = null;
 
-function getSocket() {
-  return socket;
-}
-
-function initSocket() {
-  const { events } = window;
-  socket = aSocket;
-  //socket.on(events.getSentimentScore, sendScore);
-}
-
 function preload() {
   socket = io("http://localhost:4000/");
 }
 
 function setup() {
-  createCanvas(640, 480);
-  video = createCapture(VIDEO);
-  video.size(width, height);
+  createCanvas(windowWidth, windowHeight);
+
+  const sideCamId = localStorage.getItem("sideCam");
+  const topCamId = localStorage.getItem("topCam");
+
+  const constraints1 = {
+    video: {
+      deviceId: sideCamId
+    }
+  };
+
+  const constraints2 = {
+    video: {
+      deviceId: topCamId
+    }
+  };
+
+  videoSide = createCapture(constraints1);
+  videoSide.size(width / 2, height);
+
+  videoTop = createCapture(constraints2);
+  videoTop.size(width / 2, height);
 
   // Create a new poseNet method with a single detection
-  poseNet = ml5.poseNet(video, modelReady);
-  // This sets up an event that fills the global variable "poses"
-  // with an array every time new poses are detected
+  poseNet = ml5.poseNet(videoSide, modelReady);
   poseNet.on("pose", gotPoses);
+
+  poseNetTop = ml5.poseNet(videoTop, modelReady);
+  poseNetTop.on("pose", gotTopPoses);
   // Hide the video element, and just show the canvas
-  video.hide();
+  videoSide.hide();
+  videoTop.hide();
   textSize(20);
 
-  paintStartLine = width / 2;
-
-  button = createButton("Change painting area");
-  button.position(width + 20, 20);
-  button.mousePressed(changeArea);
-
-  paintAreaText = createDiv("right side");
-  paintAreaText.position(width + 20, 60);
-
-  setInterval(sendPaintOrNot, 100);
+  setInterval(sendPaintStatus, 100);
 }
 
-function sendPaintOrNot() {
-  getSocket().emit("getPaintStatus", painting);
+function sendPaintStatus() {
+  socket.emit("getPaintStatus", painting);
 }
 
-function changeArea() {
-  if (paintingArea === "right") {
-    paintingArea = "left";
-    paintAreaText.html("left side");
-  } else {
-    paintingArea = "right";
-    paintAreaText.html("right side");
-  }
+function sendWristPosition(hand) {
+  if (hand === "right")
+    socket.emit("wristPositionR", {
+      side_X: rWristX,
+      side_Y: rWristY,
+      top_X: rWristX_Top,
+      top_Y: rWristY_Top
+    });
+  else
+    socket.emit("wristPositionL", {
+      side_X: lWristX,
+      side_Y: lWristY,
+      top_X: lWristX_Top,
+      top_Y: lWristY_Top
+    });
 }
 
 function modelReady() {
@@ -74,68 +92,130 @@ function modelReady() {
 
 function gotPoses(poses) {
   if (poses.length > 0) {
-    let rWX = poses[0].pose.keypoints[10].position.x;
-    let rWY = poses[0].pose.keypoints[10].position.y;
-    let lWX = poses[0].pose.keypoints[9].position.x;
-    let lWY = poses[0].pose.keypoints[9].position.y;
+    sideResetCnt = 0;
+    const rWX = poses[0].pose.keypoints[10].position.x;
+    const rWY = poses[0].pose.keypoints[10].position.y;
+    const lWX = poses[0].pose.keypoints[9].position.x;
+    const lWY = poses[0].pose.keypoints[9].position.y;
     rWristX = lerp(rWristX, rWX, 0.5);
     rWristY = lerp(rWristY, rWY, 0.5);
     lWristX = lerp(lWristX, lWX, 0.5);
     lWristY = lerp(lWristY, lWY, 0.5);
+  } else {
+    sideReset();
   }
 }
 
+function gotTopPoses(poses) {
+  if (poses.length > 0) {
+    const rWX = poses[0].pose.keypoints[10].position.x;
+    const rWY = poses[0].pose.keypoints[10].position.y;
+    const lWX = poses[0].pose.keypoints[9].position.x;
+    const lWY = poses[0].pose.keypoints[9].position.y;
+    rWristX_Top = lerp(rWristX_Top, rWX, 0.5);
+    rWristY_Top = lerp(rWristY_Top, rWY, 0.5);
+    lWristX_Top = lerp(lWristX_Top, lWX, 0.5);
+    lWristY_Top = lerp(lWristY_Top, lWY, 0.5);
+  }
+}
+
+let preRX = 0;
+let preRY = 0;
+function sideReset() {
+  if (preRX === rWristX && preRY === rWristY) sideResetCnt++;
+  if (sideResetCnt > 40) {
+    rWristX = 0;
+    rWristY = 0;
+    lWristX = 0;
+    lWristY = 0;
+    rWristX_Top = 0;
+    rWristY_Top = 0;
+    lWristX_Top = 0;
+    lWristY_Top = 0;
+    sideResetCnt = 0;
+  }
+  preRX = rWristX;
+  preRY = rWristY;
+
+  sendPaintStatus();
+}
+
 function draw() {
-  image(video, 0, 0);
+  background(0);
 
-  //let d = dist(rWristX, rWristY, lWristX, lWristY);
-  noFill();
-  strokeWeight(2);
-  stroke(255, 0, 0);
-  ellipse(rWristX, rWristY, 30);
-  stroke(0, 0, 255);
-  ellipse(lWristX, lWristY, 30);
+  image(videoSide, 0, 0);
+  image(videoTop, videoSide.width, 0);
 
+  loadPixels();
+  for (let i = 0; i < videoSide.height; i++) {
+    for (let j = paintLineSide; j < videoSide.width; j++) {
+      const red = pixels[j * 4 + width * 4 * i];
+      const blue = pixels[j * 4 + 1 + width * 4 * i];
+      const green = pixels[j * 4 + 2 + width * 4 * i];
+      const c = color(255 - red, 255 - blue, 255 - green);
+      set(j, i, c);
+    }
+  }
+
+  for (let i = 0; i < videoTop.height; i++) {
+    for (
+      let j = videoSide.width + paintLineTop;
+      j < videoSide.width + videoTop.width;
+      j++
+    ) {
+      const red = pixels[j * 4 + width * 4 * i];
+      const blue = pixels[j * 4 + 1 + width * 4 * i];
+      const green = pixels[j * 4 + 2 + width * 4 * i];
+      const c = color(255 - red, 255 - blue, 255 - green);
+      set(j, i, c);
+    }
+  }
+  updatePixels();
+
+  filter(GRAY);
+
+  const wristColor = color(200, 40, 100, 60);
+  fill(wristColor);
   noStroke();
-  fill(255, 0, 0);
-  textAlign(RIGHT);
-  text("right wrist", rWristX, rWristY - 30);
-  fill(0, 0, 255);
-  textAlign(LEFT);
-  text("left wrist", lWristX, lWristY - 30);
 
-  stroke(0, 255, 0);
-  line(paintStartLine, 0, paintStartLine, height);
-
-  noStroke();
-  fill(0, 255, 0);
-  textAlign(LEFT);
- 
   if (paintingArea === "right") {
-    if (rWristX > paintStartLine || lWristX > paintStartLine) {
-      text("Painting", 5, 30);
+    if (rWristX > paintLineSide) {
       painting = true;
+      ellipse(rWristX, rWristY, 80);
+      ellipse(videoSide.width + rWristX_Top, rWristY_Top, 80);
+      sendWristPosition("right");
     } else {
-      text("Rest", 5, 30);
+      painting = false;
+    }
+    if (lWristX > paintLineSide) {
+      painting = true;
+      ellipse(lWristX, lWristY, 80);
+      ellipse(videoSide.width + lWristX_Top, lWristY_Top, 80);
+      sendWristPosition("left");
+    } else {
       painting = false;
     }
   } else if (paintingArea === "left") {
-      if (rWristX < paintStartLine || lWristX < paintStartLine) {
-      text("Painting", 5, 30);
+    if (rWristX < paintLineSide) {
       painting = true;
+      ellipse(rWristX, rWristY, 80);
+      ellipse(videoSide.width + rWristX_Top, rWristY_Top, 80);
+      sendWristPosition("right");
     } else {
-      text("Rest", 5, 30);
+      painting = false;
+    }
+    if (lWristX < paintLineSide) {
+      painting = true;
+      ellipse(lWristX, lWristY, 80);
+      ellipse(videoSide.width + lWristX_Top, lWristY_Top, 80);
+      sendWristPosition("left");
+    } else {
       painting = false;
     }
   }
 }
 
 function mouseClicked() {
-  if (mouseX < width) paintStartLine = mouseX;
-}
-
-// This method can be removed after the source ID has been determined.
-function gotSources(sources) {
-  console.log(sources);
- 
+  if (mouseX < videoSide.width) paintLineSide = mouseX;
+  else paintLineTop = mouseX;
 }
