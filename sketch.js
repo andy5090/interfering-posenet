@@ -192,7 +192,7 @@ function draw() {
   if (paintingArea === "right") {
     if (rWristX > paintLineSide || lWristX > paintLineSide) {
       painting = true;
-      if (rWrisX > lWristX) {
+      if (rWristX > lWristX) {
         ellipse(rWristX, rWristY, 40);
         ellipse(videoSide.width + rWristX_Top, rWristY_Top, 40);
         sendWristPosition("right");
@@ -207,7 +207,7 @@ function draw() {
   } else if (paintingArea === "left") {
     if (rWristX < paintLineSide) {
       painting = true;
-      if (rWrisX < lWristX) {
+      if (rWristX < lWristX) {
         ellipse(rWristX, rWristY, 40);
         ellipse(videoSide.width + rWristX_Top, rWristY_Top, 40);
         sendWristPosition("right");
